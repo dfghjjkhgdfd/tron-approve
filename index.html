@@ -1,57 +1,130 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TRC20 Approval - Trust Wallet</title>
-  <script src="https://cdn.jsdelivr.net/npm/tronweb/dist/TronWeb.min.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin:auto; }
-    button { padding: 10px 20px; font-size: 16px; margin-top: 10px; }
-    pre { background:#f4f4f4; padding:10px; margin-top:15px; white-space: pre-wrap; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRON Token Approval</title>
+    <!-- WalletConnect library for desktop users -->
+    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider/dist/umd/index.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 5px; background: #ff6f00; color: #fff; border: none; margin: 10px; }
+        input { padding: 10px; font-size: 14px; width: 300px; margin: 5px; }
+        #status { margin-top: 20px; font-weight: bold; }
+    </style>
 </head>
 <body>
-  <h2>Connect TRON Wallet & Approve TokenTransfer</h2>
-  <button id="connectBtn">Connect Wallet</button>
-  <button id="approveBtn" disabled>Approve TokenTransfer</button>
+    <h1>TRON Token Approval</h1>
+    
+    <div>
+        <input id="tokenAddress" placeholder="Token Contract Address" /><br>
+        <input id="spenderAddress" placeholder="Spender Address" /><br>
+        <input id="amount" placeholder="Amount to Approve" /><br>
+        <button id="connectBtn">Connect Wallet</button>
+        <button id="approveBtn" disabled>Approve Tokens</button>
+    </div>
 
-  <pre id="status"></pre>
+    <div id="status"></div>
 
-  <script>
-    const tokenAddress = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
-    const spenderAddress = 'TX5H4BV3cRsMAo7EWEkZisCmjFZJnh2gdw';
-    const status = document.getElementById('status');
+    <script>
+        let walletType = null;
+        let provider = null;
 
-    let tronWeb;
+        // Step 1: Detect wallet
+        function detectWallet() {
+            if (window.tronWeb && window.tronWeb.ready) {
+                console.log("Tron wallet detected!");
+                return "tron";
+            }
+            if (window.WalletConnectProvider) {
+                console.log("WalletConnect available!");
+                return "walletconnect";
+            }
+            alert("No compatible wallet detected. Open in Trust Wallet / TronLink or use WalletConnect on desktop.");
+            return null;
+        }
 
-    function log(msg) { status.textContent += msg + '\n'; }
+        // Step 2: Connect desktop wallet via WalletConnect
+        async function connectDesktopWallet() {
+            const walletProvider = new WalletConnectProvider.default({
+                rpc: { 1: "https://api.trongrid.io" },
+            });
+            await walletProvider.enable();
+            console.log("Desktop wallet connected via WalletConnect!");
+            return walletProvider;
+        }
 
-    async function connectWallet() {
-      if (window.tronWeb && window.tronWeb.ready) {
-        tronWeb = window.tronWeb;
-        log('Wallet connected: ' + tronWeb.defaultAddress.base58);
-        document.getElementById('approveBtn').disabled = false;
-      } else {
-        log('Please open this page in Trust Wallet / TronLink browser');
-      }
-    }
+        // Step 3: Connect button
+        document.getElementById("connectBtn").onclick = async function() {
+            const statusDiv = document.getElementById("status");
+            statusDiv.textContent = "Connecting wallet...";
+            walletType = detectWallet();
 
-    async function approveToken() {
-      try {
-        const amount = tronWeb.toSun('1000000'); // Change amount if needed
-        const contract = await tronWeb.contract().at(tokenAddress);
-        log('Sending approve transaction...');
-        const tx = await contract.approve(spenderAddress, amount).send();
-        log('Transaction sent: ' + tx);
-        log('Check in your wallet for confirmation.');
-      } catch (err) {
-        log('Error: ' + err.message);
-      }
-    }
+            if (walletType === "tron") {
+                statusDiv.textContent = "Connected via TronLink / Trust Wallet!";
+                document.getElementById("approveBtn").disabled = false;
+            } 
+            else if (walletType === "walletconnect") {
+                provider = await connectDesktopWallet();
+                statusDiv.textContent = "Connected via WalletConnect!";
+                document.getElementById("approveBtn").disabled = false;
+            } 
+            else {
+                statusDiv.textContent = "Wallet not detected!";
+            }
+        };
 
-    document.getElementById('connectBtn').addEventListener('click', connectWallet);
-    document.getElementById('approveBtn').addEventListener('click', approveToken);
-  </script>
+        // Step 4: Approve button
+        document.getElementById("approveBtn").onclick = async function() {
+            const statusDiv = document.getElementById("status");
+            const tokenAddress = document.getElementById("tokenAddress").value.trim();
+            const spenderAddress = document.getElementById("spenderAddress").value.trim();
+            const amount = document.getElementById("amount").value.trim();
+
+            if (!tokenAddress || !spenderAddress || !amount) {
+                alert("Please fill all fields!");
+                return;
+            }
+
+            statusDiv.textContent = "Sending approve transaction...";
+
+            try {
+                if (walletType === "tron") {
+                    const tronWeb = window.tronWeb;
+                    const token = await tronWeb.contract().at(tokenAddress);
+                    const tx = await token.approve(spenderAddress, tronWeb.toSun(amount)).send();
+                    statusDiv.textContent = "Transaction sent! TX ID: " + tx;
+                    console.log("TX:", tx);
+                } 
+                else if (walletType === "walletconnect") {
+                    // Using Web3.js with WalletConnect provider
+                    const Web3 = window.Web3 || require('web3');
+                    const web3 = new Web3(provider);
+
+                    const abi = [
+                        {
+                            "constant": false,
+                            "inputs": [
+                                { "name": "_spender", "type": "address" },
+                                { "name": "_value", "type": "uint256" }
+                            ],
+                            "name": "approve",
+                            "outputs": [{ "name": "", "type": "bool" }],
+                            "type": "function"
+                        }
+                    ];
+
+                    const contract = new web3.eth.Contract(abi, tokenAddress);
+                    const accounts = await web3.eth.getAccounts();
+                    const tx = await contract.methods.approve(spenderAddress, amount).send({ from: accounts[0] });
+                    statusDiv.textContent = "Transaction sent! TX Hash: " + tx.transactionHash;
+                    console.log("TX:", tx);
+                }
+            } catch (err) {
+                console.error(err);
+                statusDiv.textContent = "Transaction failed: " + err.message;
+            }
+        };
+    </script>
 </body>
 </html>
