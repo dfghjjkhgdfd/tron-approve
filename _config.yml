@@ -1,0 +1,2 @@
+# Disable Jekyll so GitHub Pages doesn’t try to process HTML
+jekyll: false
