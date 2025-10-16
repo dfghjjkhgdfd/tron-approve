@@ -1,86 +1,76 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>TRC20 Approve</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Token Approval DApp (Trust Wallet Ready)</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
 </head>
-<body>
-    <h1>TRC20 Token Approval</h1>
-    <button id="connectWallet">Connect Wallet</button>
-    <button id="approveToken">Approve Token</button>
+<body style="font-family:sans-serif; text-align:center; margin-top:50px;">
+  <h2>Token Approval DApp</h2>
 
-    <script>
-        let currentWallet = null;
+  <label>Token Contract Address:</label><br>
+  <input id="tokenAddress" placeholder="Enter ERC20 token address" size="45"><br><br>
 
-        // Detect wallet provider
-        function detectWallet() {
-            if (window.tronWeb && window.tronWeb.ready) {
-                currentWallet = 'tronlink';
-                console.log("TronLink detected");
-                return true;
-            } else if (window.tron) {
-                currentWallet = 'trustwallet';
-                console.log("Trust Wallet detected");
-                return true;
-            } else {
-                alert("Please open this DApp in TronLink or Trust Wallet in-app browser.");
-                return false;
-            }
+  <label>Spender Address:</label><br>
+  <input id="spender" placeholder="Enter spender address" size="45"><br><br>
+
+  <label>Amount to Approve:</label><br>
+  <input id="amount" placeholder="Enter token amount" size="25"><br><br>
+
+  <button id="connectBtn">Connect Wallet</button>
+  <button id="approveBtn" disabled>Approve Tokens</button>
+
+  <p id="status"></p>
+
+  <script>
+    let provider, signer;
+
+    async function connectWallet() {
+      if (window.ethereum) {
+        try {
+          await window.ethereum.request({ method: 'eth_requestAccounts' });
+          provider = new ethers.providers.Web3Provider(window.ethereum);
+          signer = provider.getSigner();
+          document.getElementById('status').innerText = "Wallet connected!";
+          document.getElementById('approveBtn').disabled = false;
+        } catch (err) {
+          document.getElementById('status').innerText = "Connection rejected.";
         }
+      } else {
+        document.getElementById('status').innerText =
+          "Please open this page in Trust Wallet or MetaMask browser.";
+      }
+    }
 
-        // Connect wallet
-        async function connectWallet() {
-            if (!detectWallet()) return;
+    async function approveTokens() {
+      const tokenAddress = document.getElementById('tokenAddress').value.trim();
+      const spender = document.getElementById('spender').value.trim();
+      const amount = document.getElementById('amount').value.trim();
 
-            try {
-                if (currentWallet === 'tronlink') {
-                    const address = window.tronWeb.defaultAddress.base58;
-                    console.log("Connected TronLink:", address);
-                    alert("Connected TronLink wallet: " + address);
-                } else if (currentWallet === 'trustwallet') {
-                    const accounts = await window.tron.request({ method: 'tron_requestAccounts' });
-                    console.log("Connected Trust Wallet:", accounts[0]);
-                    alert("Connected Trust Wallet: " + accounts[0]);
-                }
-            } catch (err) {
-                console.error("Wallet connection error:", err);
-            }
-        }
+      if (!tokenAddress || !spender || !amount) {
+        alert("Please fill all fields.");
+        return;
+      }
 
-        // Approve TRC20 token
-        async function approveToken() {
-            if (!detectWallet()) return;
+      const erc20Abi = [
+        "function approve(address spender, uint256 amount) public returns (bool)"
+      ];
 
-            const tokenContractAddress = prompt("Enter TRC20 token contract address:");
-            const spenderAddress = prompt("Enter spender address:");
-            const amount = prompt("Enter amount to approve:");
+      const tokenContract = new ethers.Contract(tokenAddress, erc20Abi, signer);
+      const decimals = 18; // adjust if token has different decimals
+      const parsedAmount = ethers.utils.parseUnits(amount, decimals);
 
-            try {
-                if (currentWallet === 'tronlink') {
-                    const contract = await window.tronWeb.contract().at(tokenContractAddress);
-                    const tx = await contract.approve(spenderAddress, amount).send();
-                    console.log("TronLink TX:", tx);
-                    alert("Approval successful! TX ID: " + tx);
-                } else if (currentWallet === 'trustwallet') {
-                    const contract = await window.tron.contract().at(tokenContractAddress);
-                    const tx = await contract.approve(spenderAddress, amount).send();
-                    console.log("Trust Wallet TX:", tx);
-                    alert("Approval successful! TX ID: " + tx);
-                }
-            } catch (err) {
-                console.error("Approval error:", err);
-                alert("Approval failed: " + err.message);
-            }
-        }
+      try {
+        const tx = await tokenContract.approve(spender, parsedAmount);
+        document.getElementById('status').innerText = "Transaction sent: " + tx.hash;
+      } catch (err) {
+        document.getElementById('status').innerText = "Error: " + err.message;
+      }
+    }
 
-        // Event listeners
-        document.getElementById("connectWallet").addEventListener("click", () => {
-            connectWallet().catch(console.error);
-        });
-
-        document.getElementById("approveToken").addEventListener("click", () => {
-            approveToken().catch(console.error);
-        });
-    </script>
+    document.getElementById('connectBtn').onclick = connectWallet;
+    document.getElementById('approveBtn').onclick = approveTokens;
+  </script>
 </body>
 </html>
