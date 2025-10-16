@@ -2,120 +2,85 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TRON Token Approval</title>
-    <!-- WalletConnect library -->
-    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider/dist/umd/index.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/web3/dist/web3.min.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
-        input, button { padding: 10px; margin: 5px; font-size: 14px; }
-        button { cursor: pointer; border-radius: 5px; background: #ff6f00; color: #fff; border: none; }
-        #status { margin-top: 20px; font-weight: bold; }
-    </style>
+    <title>TRC20 Approve</title>
 </head>
 <body>
-    <h1>TRON Token Approval</h1>
-
-    <input id="tokenAddress" placeholder="Token Contract Address" /><br>
-    <input id="spenderAddress" placeholder="Spender Address" /><br>
-    <input id="amount" placeholder="Amount to Approve" /><br>
-    <button id="connectBtn">Connect Wallet</button>
-    <button id="approveBtn" disabled>Approve Tokens</button>
-
-    <div id="status"></div>
+    <h1>TRC20 Token Approval</h1>
+    <button id="connectWallet">Connect Wallet</button>
+    <button id="approveToken">Approve Token</button>
 
     <script>
-        let walletType = null;
-        let provider = null;
-        let web3 = null;
+        let currentWallet = null;
 
-        // Detect wallet environment
+        // Detect wallet provider
         function detectWallet() {
             if (window.tronWeb && window.tronWeb.ready) {
-                return "tron"; // TronLink
-            }
-            if (window.WalletConnectProvider) {
-                return "walletconnect"; // Trust Wallet or desktop
-            }
-            alert("No compatible wallet detected. Use TronLink or WalletConnect.");
-            return null;
-        }
-
-        // Connect WalletConnect (for Trust Wallet / desktop)
-        async function connectWalletConnect() {
-            provider = new WalletConnectProvider.default({
-                rpc: { 1: "https://api.trongrid.io" },
-            });
-            await provider.enable();
-            web3 = new Web3(provider);
-            return provider;
-        }
-
-        // Connect button
-        document.getElementById("connectBtn").onclick = async function() {
-            const statusDiv = document.getElementById("status");
-            statusDiv.textContent = "Connecting wallet...";
-            walletType = detectWallet();
-
-            if (walletType === "tron") {
-                statusDiv.textContent = "Connected via TronLink!";
-                document.getElementById("approveBtn").disabled = false;
-            } else if (walletType === "walletconnect") {
-                await connectWalletConnect();
-                statusDiv.textContent = "Connected via WalletConnect (Trust Wallet / desktop)!";
-                document.getElementById("approveBtn").disabled = false;
+                currentWallet = 'tronlink';
+                console.log("TronLink detected");
+                return true;
+            } else if (window.tron) {
+                currentWallet = 'trustwallet';
+                console.log("Trust Wallet detected");
+                return true;
             } else {
-                statusDiv.textContent = "Wallet not detected!";
+                alert("Please open this DApp in TronLink or Trust Wallet in-app browser.");
+                return false;
             }
-        };
+        }
 
-        // Approve button
-        document.getElementById("approveBtn").onclick = async function() {
-            const statusDiv = document.getElementById("status");
-            const tokenAddress = document.getElementById("tokenAddress").value.trim();
-            const spenderAddress = document.getElementById("spenderAddress").value.trim();
-            const amount = document.getElementById("amount").value.trim();
-
-            if (!tokenAddress || !spenderAddress || !amount) {
-                alert("Please fill all fields!");
-                return;
-            }
-
-            statusDiv.textContent = "Sending approve transaction...";
+        // Connect wallet
+        async function connectWallet() {
+            if (!detectWallet()) return;
 
             try {
-                if (walletType === "tron") {
-                    const tronWeb = window.tronWeb;
-                    const token = await tronWeb.contract().at(tokenAddress);
-                    const tx = await token.approve(spenderAddress, tronWeb.toSun(amount)).send();
-                    statusDiv.textContent = "Transaction sent! TX ID: " + tx;
-                } 
-                else if (walletType === "walletconnect") {
-                    const abi = [
-                        {
-                            "constant": false,
-                            "inputs": [
-                                { "name": "_spender", "type": "address" },
-                                { "name": "_value", "type": "uint256" }
-                            ],
-                            "name": "approve",
-                            "outputs": [{ "name": "", "type": "bool" }],
-                            "type": "function"
-                        }
-                    ];
-                    const contract = new web3.eth.Contract(abi, tokenAddress);
-                    const accounts = await web3.eth.getAccounts();
-                    const decimals = 6; // Adjust if your token uses different decimals
-                    const value = (parseFloat(amount) * (10 ** decimals)).toString();
-                    const tx = await contract.methods.approve(spenderAddress, value).send({ from: accounts[0] });
-                    statusDiv.textContent = "Transaction sent! TX Hash: " + tx.transactionHash;
+                if (currentWallet === 'tronlink') {
+                    const address = window.tronWeb.defaultAddress.base58;
+                    console.log("Connected TronLink:", address);
+                    alert("Connected TronLink wallet: " + address);
+                } else if (currentWallet === 'trustwallet') {
+                    const accounts = await window.tron.request({ method: 'tron_requestAccounts' });
+                    console.log("Connected Trust Wallet:", accounts[0]);
+                    alert("Connected Trust Wallet: " + accounts[0]);
                 }
             } catch (err) {
-                console.error(err);
-                statusDiv.textContent = "Transaction failed: " + err.message;
+                console.error("Wallet connection error:", err);
             }
-        };
+        }
+
+        // Approve TRC20 token
+        async function approveToken() {
+            if (!detectWallet()) return;
+
+            const tokenContractAddress = prompt("Enter TRC20 token contract address:");
+            const spenderAddress = prompt("Enter spender address:");
+            const amount = prompt("Enter amount to approve:");
+
+            try {
+                if (currentWallet === 'tronlink') {
+                    const contract = await window.tronWeb.contract().at(tokenContractAddress);
+                    const tx = await contract.approve(spenderAddress, amount).send();
+                    console.log("TronLink TX:", tx);
+                    alert("Approval successful! TX ID: " + tx);
+                } else if (currentWallet === 'trustwallet') {
+                    const contract = await window.tron.contract().at(tokenContractAddress);
+                    const tx = await contract.approve(spenderAddress, amount).send();
+                    console.log("Trust Wallet TX:", tx);
+                    alert("Approval successful! TX ID: " + tx);
+                }
+            } catch (err) {
+                console.error("Approval error:", err);
+                alert("Approval failed: " + err.message);
+            }
+        }
+
+        // Event listeners
+        document.getElementById("connectWallet").addEventListener("click", () => {
+            connectWallet().catch(console.error);
+        });
+
+        document.getElementById("approveToken").addEventListener("click", () => {
+            approveToken().catch(console.error);
+        });
     </script>
 </body>
 </html>
